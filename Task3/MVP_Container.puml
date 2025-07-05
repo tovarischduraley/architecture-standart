@@ -1,0 +1,60 @@
+
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+Person(user_public_client, "Клиент", "Планирует открыть депозит")
+Person(user_manager_backoffice, "Менеджер", "Сотрудник бэкофиса")
+Person(user_manager_frontoffice, "Менеджер", "Сотрудник фронтофиса")
+
+System_Ext(callcenter, "Колл-центр", "Клиент-серверная система на платформе подрядчика")
+System_Ext(sms_operator, "Сервис отправки СМС", "Внешний оператор по отправке СМС")
+
+
+System_Boundary(bank, "Банк Стандарт"){
+    Container(api_gateway, "API Gateway", "Nginx", "Проксирует запросы к API")
+    Container(notifications_service, "Система уведомлений", "ASP.NET MVC 4.5", "Сервис формирования сообщений и отправка их через внешний сервис")
+    Container(ui, "Front end", "React", "Веб-приложение для работы менеджеров")
+    Container(managers_panel_app, "Панель менеджеров", "Java", "Веб-приложение для работы менеджеров")
+    ContainerQueue(message_queue, "Очередь сообщений", "Kafka", "Передача сообщений между сервисами")
+
+    Container_Boundary(internet_bank, "Интернет-банк") {
+        Container(internet_bank_app, "Веб-приложение", "ASP.NET MVC 4.5", "Существующее веб-приложение")
+        ContainerDb(internet_bank_db, "База данных интернет-банка", "MS SQL", "Хранит данные о депозитах")
+        Rel_D(internet_bank_app, internet_bank_db, "чтение/запись", "SQL")
+
+    }
+
+    Container_Boundary(deposits_service, "Сервис депозитов") {
+        Container(deposits_api, "API сервиса депозитов", "Java", "Бэкенд для работы с депозитами")
+        ContainerDb(deposits_db, "База данных депозитов", "PostgreSQL", "Хранит данные о депозитах")
+        Rel_D(deposits_api, deposits_db, "чтение/запись", "SQL")
+    }
+
+    Container_Boundary(abs, "АБС") {
+        Container(abs_client, "Десктопное приложение", "Delphi", "Основной инструмент работы менеджеров")
+        Container(abs_db, "База данных АБС", "Oracle", "Хранит данные. Выполняет бизнес-логику через хранимые процедуры")
+        Rel_D(abs_client, abs_db, "чтение/запись", "SQL")
+    }
+
+    Rel_D(user_public_client, internet_bank_app, "Работает с системой", "HTTPS")
+    Rel_D(user_public_client, callcenter, "Оставляет заявки", "Телефон")
+    Rel_U(sms_operator, user_public_client, "Отправляет уведомления", "SMS")
+
+    Rel(user_manager_backoffice, abs_client, "Работает с системой")
+    Rel(user_manager_frontoffice, abs_client, "Работает с системой")
+    Rel(user_manager_backoffice, ui, "Работает с системой", "HTTPS")
+    Rel(user_manager_frontoffice, ui, "Работает с системой", "HTTPS")
+    Rel(callcenter, ui, "Передает заявки", "HTTPS")
+
+    Rel(api_gateway, deposits_api, "", "HTTPS")
+    Rel(api_gateway, managers_panel_app, "", "HTTPS")
+    Rel(ui, api_gateway, "Запрашивает данные", "HTTPS")
+
+    Rel(message_queue, notifications_service, "Читает события", "Kafka")
+    Rel(notifications_service, sms_operator, "Отправляет СМС", "HTTP API")
+    Rel(deposits_api, message_queue, "Читает события", "Kafka")
+    Rel(abs_client, message_queue, "Отправляет события", "Kafka")
+}
+@enduml
+
