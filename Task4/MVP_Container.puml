@@ -1,0 +1,30 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+AddElementTag("storage", $shape=RoundedBoxShape(), $bgColor="lightSkyBlue", $fontColor="white")
+
+Person(cc_manager, "Специалист Колл-центра")
+Person(bo_manager, "Специалист бэкофиса", "Менеджер по работе с депозитами")
+System_Ext(call_center, "Колл-центр", "Прием звонков и заявок от клиентов")
+
+System_Boundary(bank, "Банк Стандарт"){
+    System(deposits, "Депозиты", "Система управления депозитами")
+    ContainerQueue(message_queue, "Очередь сообщений", "Kafka", "Передача сообщений между сервисами")
+
+    Container_Boundary(file_transfer, "Передача файлов") {
+        Container(sftp, "SFTP-Сервер", "SFTP", "Сервер для передачи ставок по депозитам")
+        Container(s3, "S3", "nfs","", $tags = "storage")
+        Container(ft_api, "Web-сервер", "REST", "Web-сервер для работы с s3-хранилищем")
+
+        Rel_D(sftp, s3, "Получает файлы", "S3")
+        Rel_L(ft_api, s3, "Записывает файлы", "S3")
+    }
+
+    Rel_D(deposits, message_queue, "Отправляет ставки по депозитам", "Kafka")
+    Rel_R(ft_api, message_queue, "Получает ставки по депозитам", "Kafka")
+    }
+
+Rel_D(cc_manager, call_center, "Принимает звонки и заявки от клиентов", "Телефон")
+Rel_D(cc_manager, sftp, "Запрашивает ставки по депозитам", "SFTP")
+Rel_D(bo_manager, deposits, "Обновляет ставки по депозитам", "HTTPS")
+@enduml
